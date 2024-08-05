@@ -25,18 +25,26 @@ if __name__ == "__main__":
     )
     imagettes_array = data.get_imagettes_array()
 
+<<<<<<< HEAD
     # Format training data 
+=======
+    # Format training data
+>>>>>>> 156f05685cb797e305e7bb4e78ab9c4400266e75
     training_inputs = np.array(
         [imagette.get_imagette().flatten() for imagette in imagettes_array]
     )
     training_outputs = np.array(
         [imagette.get_etiquette() for imagette in imagettes_array]
     )
+<<<<<<< HEAD
     # création d'un tableau de sortie one-hot
     # sert à transformer les étiquettes en vecteurs de sortie
     one_hot_outputs = np.zeros((training_outputs.size, training_outputs.max() + 1))
     # crée un vecteur de sortie one-hot pour chaque étiquette
     # sert à transformer les étiquettes en vecteurs de sortie
+=======
+    one_hot_outputs = np.zeros((training_outputs.size, training_outputs.max() + 1))
+>>>>>>> 156f05685cb797e305e7bb4e78ab9c4400266e75
     one_hot_outputs[np.arange(training_outputs.size), training_outputs] = 1
 
     # Training loop
@@ -68,4 +76,8 @@ if __name__ == "__main__":
         if actual_label != predicted_label:
             num_failed += 1
 
+<<<<<<< HEAD
     print(f"Failed: {num_failed}/{len(training_inputs)}")
+=======
+    print(f"Failed: {num_failed}/{len(training_inputs)}")
+>>>>>>> 156f05685cb797e305e7bb4e78ab9c4400266e75
