@@ -1,113 +1,71 @@
-from concurrent.futures import ThreadPoolExecutor
-import random
 import numpy as np
+import random
 
 from MLP import MLP
 from MNIST.Donnees import Donnees
 from TransfertFunction import Sigmoide
-import time
+from TransfertFunction import Hyperbolique
 
-
-def main(args):
-    couches = []
-    try:
-        couches = [int(x) for x in args[0].split(',')]
-        couches.append(10)
-        initialLearningRate = 0.3
-        finalLearningRate = 0.3
-        shuffle = True
-        tauxSortie = 0.05
-        maxIteration = 40
-    except Exception as e:
-        print("Erreur dans la saisie des paramètres => ")
-        print("Usage : python main.py couchesCachés initialLearningRate finalLearningRate schuffle tauxSortie maxIteration")
-        print(e)
-        exit(1)
-
-    print("Chargement des données..")
-    with ThreadPoolExecutor() as executor:
-        future_train = executor.submit(Donnees.load_imagette, -1, 'donnees/images.idx3-ubyte', 'donnees/labels.idx1-ubyte')
-        future_test = executor.submit(Donnees.load_imagette, -1, 'donnees/images.idx3-ubyte', 'donnees/labels.idx1-ubyte')
-        donneesEntrainement = future_train.result()
-        donneesTest = future_test.result()
-
-    if donneesEntrainement is None or donneesTest is None:
-        print("Impossible de lire les images")
-        exit(1)
-
-    print(f"nb images d'entrainement : {len(donneesEntrainement.get_imagettes_array())}")
-    tailleImage = donneesEntrainement.get_imagettes_array()[0].get_height() * donneesEntrainement.get_imagettes_array()[0].get_width()
-    couches.insert(0, tailleImage)
-
-    mlp = MLP(couches, initialLearningRate, Sigmoide())
-
-    imagesEntrainements = donneesEntrainement.get_imagettes_array()
-    imagesDeTests = donneesTest.get_imagettes_array()
-
-    runMLP(couches, initialLearningRate, finalLearningRate, shuffle, imagesEntrainements, imagesDeTests, tauxSortie, maxIteration, mlp)
-
-
-def runMLP(couches, initialLearningRate, finalLearningRate, shuffle, imagesEntrainements, imagesDeTests, tauxSortie, maxIteration, mlp):
-    iteration = 0
-    learned = False
-    leanringRateDegressif = (initialLearningRate != finalLearningRate)
-    slope = (finalLearningRate - initialLearningRate) / maxIteration
-    nbRepetition = 10
-    allTime = time.time()
-    
-    print("Iteration;Taux d'erreur;Erreur moyenne;Durée" + (f";Taux d'apprentissage" if leanringRateDegressif else ""))
-
-    while iteration < maxIteration and not learned:
-        print(f"Iteration {iteration}")
-        if leanringRateDegressif:
-            mlp.setLearningRate(initialLearningRate + slope * iteration)
-        startTime = time.time()
-        errorSum = 0
-        for rep in range(nbRepetition):
-            print(f"  Répétition {rep}")
-            if shuffle:
-                random.shuffle(imagesEntrainements)
-            for index, imagette in enumerate(imagesEntrainements):
-                if index % 1000 == 0:
-                    print(f"    Traitement de l'image {index}")
-                etiquetteInput = imagette.get_etiquette()
-                errorSum += mlp.backPropagate(toOneArray(imagette.get_imagette()), intToArray(int(etiquetteInput)))
-        errorBackPropagate = errorSum / (len(imagesEntrainements) * 10)
-
-        iteration += 1
-        nbIncorrect = 0
-        for imagette in imagesDeTests:
-            etiquetteInput = imagette.get_etiquette()
-            output = mlp.execute(toOneArray(imagette.get_imagette()))
-            if findMaxIndex(output) != int(etiquetteInput):
-                nbIncorrect += 1
-            print(f"Attendu : {etiquetteInput} - Trouvé : {findMaxIndex(output)}")
-        tauxIncorrect = nbIncorrect / len(imagesDeTests)
-        endTime = time.time()
-        duration = (endTime - startTime) * 1000
-
-        print(f"{iteration};{tauxIncorrect};{errorBackPropagate};{duration}" + (f";{mlp.getLearningRate()}" if leanringRateDegressif else ""))
-
-        if tauxIncorrect < tauxSortie:
-            learned = True
-            allEndTime = time.time()
-            print(f"Appris en {(allEndTime - allTime) * 1000} ms")
-
-
-def intToArray(input):
-    result = np.zeros(10)
-    result[input] = 1
-    return result
-
-
-def toOneArray(array):
-    return array.flatten() / 255.0
-
-
-def findMaxIndex(array):
-    return np.argmax(array)
-
-
+# Example usage
 if __name__ == "__main__":
-    import sys
-    main(sys.argv[1:])
+    # Configure MLP
+    nb_images = 10000
+    pixels = 28 * 28  # Assuming MNIST images are 28x28 pixels
+    layers = [pixels, 50, 50, 10]
+    learning_rate = 0.6
+    activation_function = Sigmoide()  # Choose activation function
+
+    mlp = MLP(layers, learning_rate, activation_function)
+
+    # Load MNIST data
+    data = Donnees.load_imagette(
+        nb_images,
+        "donnees/images.idx3-ubyte",
+        "donnees/labels.idx1-ubyte",
+    )
+    imagettes_array = data.get_imagettes_array()
+
+    # Format training data 
+    training_inputs = np.array(
+        [imagette.get_imagette().flatten() for imagette in imagettes_array]
+    )
+    training_outputs = np.array(
+        [imagette.get_etiquette() for imagette in imagettes_array]
+    )
+    # création d'un tableau de sortie one-hot
+    # sert à transformer les étiquettes en vecteurs de sortie
+    one_hot_outputs = np.zeros((training_outputs.size, training_outputs.max() + 1))
+    # crée un vecteur de sortie one-hot pour chaque étiquette
+    # sert à transformer les étiquettes en vecteurs de sortie
+    one_hot_outputs[np.arange(training_outputs.size), training_outputs] = 1
+
+    # Training loop
+    max_epochs = 1000000
+    target_error = 0.1
+    epoch = 1
+    total_error = 1.0
+
+    while epoch < max_epochs and (total_error / epoch) > target_error:
+        random_index = random.randint(0, nb_images - 1)
+        input_data = training_inputs[random_index]
+        output_data = one_hot_outputs[random_index]
+
+        error = mlp.backPropagate(input_data, output_data)
+        total_error += error
+        epoch += 1
+
+        print(f"Epoch: {epoch}, Error: {total_error / epoch}", end="\r")
+
+    # Testing on training examples
+    num_failed = 0
+    print("Testing on training examples:")
+    for i in range(len(training_inputs)):
+        input_data = training_inputs[i]
+        predicted_output = mlp.feed_forward(input_data)
+        predicted_label = np.argmax(predicted_output)
+        actual_label = training_outputs[i]
+        print(f"Expected: {actual_label}, Predicted: {predicted_label}")
+        if actual_label != predicted_label:
+            num_failed += 1
+
+    print(f"Failed: {num_failed}/{len(training_inputs)}")
